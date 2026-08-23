@@ -13,7 +13,7 @@ def main():
     print("main running")
     config_file = config()
 
-    device = utils.get_device('cpu') 
+    device = utils.get_device('cuda') 
     print(f"device: {device}")
 
     print(config_file.hidden_dense_sizes)
@@ -44,4 +44,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt")
