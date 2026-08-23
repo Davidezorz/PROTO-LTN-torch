@@ -24,7 +24,7 @@ class ZSLLightningModel(pl.LightningModule):
             self.cnn = torch.nn.Sequential(*(list(resnet.children())[:-1]), 
                                              torch.nn.Flatten())
 
-        if config_file.train_cnn:
+        if not config_file.train_cnn:
             self.cnn.requires_grad_(False)
             self.cnn.eval()
 
