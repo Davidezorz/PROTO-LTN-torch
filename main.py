@@ -6,12 +6,14 @@ from lightning_model import ZSLLightningModel
 
 import utils
 from config import config
-
+# ssh -l "Il Giudice" 100.106.7.48
+# Documents\.pyvenv\Scripts\activate.bat
 
 
 def main():
     print("main running")
     config_file = config()
+    pl.seed_everything(0)
 
     device = utils.get_device('cuda') 
     print(f"device: {device}")
@@ -31,7 +33,23 @@ def main():
 
 
     # Define model
-    model = ZSLLightningModel(config_file, data_module.all_data)
+    steps = len(data_module.train_dataloader())
+    if config_file.checkpoint:
+        model = ZSLLightningModel.load_from_checkpoint(
+            checkpoint_path=config_file.checkpoint,
+            config_file=config_file,
+            all_data=data_module.all_data,
+            train_cnn=config_file.train_cnn,
+            steps_per_epoch=steps
+        )
+    else:
+        model = ZSLLightningModel(
+            config_file, 
+            data_module.all_data, 
+            train_cnn=config_file.train_cnn,
+            steps_per_epoch=steps
+        )
+        
     model.to(device)
 
 

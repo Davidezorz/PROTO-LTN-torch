@@ -7,11 +7,12 @@ import torchvision.models
 
 class ZSLLightningModel(pl.LightningModule):
 
-    def __init__(self, config_file, all_data):
+    def __init__(self, config_file, all_data, train_cnn=False, steps_per_epoch=1):
         super().__init__()
         self.config_file = config_file
         self.compute_feature = config_file.compute_feature
-        self.train_cnn = config_file.train_cnn
+        self.train_cnn = train_cnn
+        self.steps_per_epoch = steps_per_epoch
         
         # 1. Initialize the core Logic Tensor Network model
         input_dim = all_data['attributes_class_matrix'].shape[1]
@@ -41,11 +42,40 @@ class ZSLLightningModel(pl.LightningModule):
 
     def configure_optimizers(self):
         params = [{'params': self.embeddingFunction.parameters(), 'lr': self.config_file.learning_rate}]
-        if self.train_cnn == True: params.append({'params': self.cnn.parameters(), 'lr': 1e-5} )
+        if self.train_cnn: 
+            params.append({'params': self.cnn.parameters(), 'lr': 1e-5})
 
         optimizer = torch.optim.Adam(params)
-        return optimizer
 
+        if self.train_cnn:
+            warmup_steps = 2 * self.steps_per_epoch
+
+            # Lambda for group 1 (CNN): Linearly scales from 0.0 to 1.0 over warmup_steps
+            def cnn_warmup(current_step):
+                if current_step < warmup_steps:
+                    return float(current_step) / float(max(1, warmup_steps))
+                return 1.0
+
+            def emb_warmup(current_step):
+                if current_step < warmup_steps:
+                    return float(current_step) / float(max(1, self.steps_per_epoch))
+                return 1.0
+
+            scheduler = torch.optim.lr_scheduler.LambdaLR(
+                optimizer,
+                lr_lambda=[emb_warmup, cnn_warmup]
+            )
+
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": scheduler,
+                    "interval": "step",
+                    "frequency": 1
+                }
+            }
+
+        return optimizer
 
     def _process_batch(self, batch):
         data, label, attributes = batch

@@ -46,6 +46,7 @@ class ZSLImageDataset(Dataset):
         
         if is_train:
             self.transform = transforms.Compose([
+                transforms.Resize(256),
                 transforms.RandomResizedCrop(224),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
