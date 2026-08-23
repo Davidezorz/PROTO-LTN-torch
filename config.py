@@ -28,6 +28,6 @@ class config:
     regularization_parameter    = 1e-5
     learning_rate               = 1e-4
 
-    compute_feature             = False
+    compute_feature             = True
     train_cnn                   = False
     experiment_name             = 'Awa2_ENDTOEND_ZSL_prototypes_with_LTN_v4_negation_TRUNCATED_0.01'

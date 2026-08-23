@@ -4,11 +4,13 @@ import ltn
 import numpy as np
 
 
+
 # ╭───────────────────────────────────────────────────────────────────────────╮
 # │                    Custom LTN Operations & Predicates                     │
 # ╰───────────────────────────────────────────────────────────────────────────╯
 
 class AggregPProd(ltn.fuzzy_ops.AggregationOperator):
+    
     def __init__(self, p=2, stable=True):
         self.p = p
         self.stable = stable
