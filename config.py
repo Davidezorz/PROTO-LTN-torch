@@ -12,13 +12,13 @@ class config:
     p_agg_for_all               = 2
     satisfiabilityAggregation   = "Aggreg_pMeanError"               # sempre questo
 
-    loss                        = "1-aggregator"                    # "1-aggregator" #  log
+    loss                        = "1-aggregator"                    # 1-aggregator      log
     forAllAggregator            = "Aggreg_pProd"                    # Aggreg_pMeanError Aggreg_pProd
-    negative_experiment         = True
+    # negative_experiment         = False
     pretrained                  = False
     weights                     = ""
     similarity                  = "euclidean_distance"              # normal_distance
-    negation_axioms             = False
+    negation_axioms             = True
     activation_function         = "relu"
     hidden_dense_sizes          = [1600, 2048]
     eps                         = 1e-4
@@ -29,6 +29,7 @@ class config:
     learning_rate               = 1e-4
 
     compute_feature             = True
+    train_emb                   = False
     train_cnn                   = True
     checkpoint                  = 'lightning_logs/version_4/checkpoints/epoch=9-step=7360.ckpt'
     # checkpoint                  = 'lightning_logs/version_6/checkpoints/epoch=0-step=736.ckpt'

@@ -7,11 +7,15 @@ import torchvision.models
 
 class ZSLLightningModel(pl.LightningModule):
 
-    def __init__(self, config_file, all_data, train_cnn=False, steps_per_epoch=1):
+    def __init__(self, config_file, all_data, 
+                 train_cnn=False, 
+                 train_emb=True, 
+                 steps_per_epoch=1):
         super().__init__()
         self.config_file = config_file
         self.compute_feature = config_file.compute_feature
         self.train_cnn = train_cnn
+        self.train_emb = train_emb
         self.steps_per_epoch = steps_per_epoch
         
         # 1. Initialize the core Logic Tensor Network model
@@ -29,6 +33,10 @@ class ZSLLightningModel(pl.LightningModule):
             self.cnn.requires_grad_(False)
             self.cnn.eval()
 
+        if not config_file.train_emb:
+            self.embeddingFunction.requires_grad_(False)
+            self.embeddingFunction.eval()
+
         # 2. Register global data as "buffers"
         self.register_buffer('attributes_class_matrix', all_data['attributes_class_matrix'])
         self.register_buffer('train_classes',           all_data['train_classes'])
@@ -41,41 +49,52 @@ class ZSLLightningModel(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        params = [{'params': self.embeddingFunction.parameters(), 'lr': self.config_file.learning_rate}]
-        if self.train_cnn: 
-            params.append({'params': self.cnn.parameters(), 'lr': 1e-5})
+        params = []
+        lr_lambdas = []
+        
+        warmup_steps = 2 * self.steps_per_epoch
 
-        optimizer = torch.optim.Adam(params)
-
-        if self.train_cnn:
-            warmup_steps = 2 * self.steps_per_epoch
-
-            # Lambda for group 1 (CNN): Linearly scales from 0.0 to 1.0 over warmup_steps
-            def cnn_warmup(current_step):
-                if current_step < warmup_steps:
-                    return float(current_step) / float(max(1, warmup_steps))
-                return 1.0
-
+        # Setup Embedding Function Optimization
+        if self.train_emb:
+            params.append({'params': self.embeddingFunction.parameters(), 'lr': self.config_file.learning_rate})
+            
             def emb_warmup(current_step):
                 if current_step < warmup_steps:
                     return float(current_step) / float(max(1, self.steps_per_epoch))
                 return 1.0
+            lr_lambdas.append(emb_warmup)
 
-            scheduler = torch.optim.lr_scheduler.LambdaLR(
-                optimizer,
-                lr_lambda=[emb_warmup, cnn_warmup]
-            )
+        # CNN Optimization
+        if self.train_cnn:
+            params.append({'params': self.cnn.parameters(), 'lr': 1e-5})
+            
+            def cnn_warmup(current_step):
+                if current_step < warmup_steps:
+                    return float(current_step) / float(max(1, warmup_steps))
+                return 1.0
+            lr_lambdas.append(cnn_warmup)
 
-            return {
-                "optimizer": optimizer,
-                "lr_scheduler": {
-                    "scheduler": scheduler,
-                    "interval": "step",
-                    "frequency": 1
-                }
+        # Safety check
+        if not params:
+            raise ValueError("Both train_emb and train_cnn are False. Nothing to optimize!")
+
+        optimizer = torch.optim.Adam(params)
+
+        # Apply the dynamically built lambdas
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer,
+            lr_lambda=lr_lambdas
+        )
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+                "frequency": 1
             }
+        }
 
-        return optimizer
 
     def _process_batch(self, batch):
         data, label, attributes = batch
