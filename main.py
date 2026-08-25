@@ -6,6 +6,9 @@ from lightning_model import ZSLLightningModel
 
 import utils
 from config import config
+import TCAV
+import gcam
+
 # ssh -l "Il Giudice" 100.106.7.48
 # Documents\.pyvenv\Scripts\activate.bat
 
@@ -53,9 +56,21 @@ def main():
     model.to(device)
 
 
+    #TCAV
+    # TCAV.run_tcav(model, data_module, target_class_name="tiger", attribute_name="stripes")
+    # TCAV.run_tutorial_tcav_lib(model, data_module, target_class_name="zebra")
+
+    # grad cam
+    # gcam.plot_gcam(model, data_module, device)
+
+    # TSNE
+    from visualization import plot_tsne_with_synthetic_vectors
+    plot_tsne_with_synthetic_vectors(model, data_module)
+    
+
     # 3. Train
-    trainer = pl.Trainer(max_epochs=config_file.epochs, accelerator=device)
-    trainer.fit(model, data_module)
+    # trainer = pl.Trainer(max_epochs=config_file.epochs, accelerator=device)
+    # trainer.fit(model, data_module)
 
 
 

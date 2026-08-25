@@ -66,7 +66,8 @@ class ZSLLightningModel(pl.LightningModule):
 
         # CNN Optimization
         if self.train_cnn:
-            params.append({'params': self.cnn.parameters(), 'lr': 1e-5})
+            params.append({'params': self.cnn.parameters(), 
+                           'lr': self.config_file.learning_rate_cnn})
             
             def cnn_warmup(current_step):
                 if current_step < warmup_steps:
