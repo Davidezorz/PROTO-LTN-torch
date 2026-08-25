@@ -168,7 +168,7 @@ class ZSLLightningModel(pl.LightningModule):
             self.log('ce_loss', ce_loss, prog_bar=True, on_step=False, on_epoch=True)
             
             # Add it to the main LTN loss, scaled by the weight
-            loss += self.ce_weight * ce_loss
+            loss += self.ce_weight * ce_loss 
 
         # Calculate Accuracy (without tracking gradients)
         with torch.no_grad():
