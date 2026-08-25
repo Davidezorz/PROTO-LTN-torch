@@ -16,7 +16,10 @@ class ZSLLightningModel(pl.LightningModule):
         self.compute_feature = config_file.compute_feature
         self.train_cnn = train_cnn
         self.train_emb = train_emb
+        self.use_ce_loss = getattr(config_file, 'use_ce_loss', False)
+        self.ce_weight = getattr(config_file, 'ce_weight', 0.1)
         self.steps_per_epoch = steps_per_epoch
+
         
         # 1. Initialize the core Logic Tensor Network model
         input_dim = all_data['attributes_class_matrix'].shape[1]
@@ -37,6 +40,13 @@ class ZSLLightningModel(pl.LightningModule):
             self.embeddingFunction.requires_grad_(False)
             self.embeddingFunction.eval()
 
+        if self.use_ce_loss and config_file.compute_feature:
+            # Find the max class index to set the output dimension safely
+            num_classes = torch.max(all_data['all_classes']).item() + 1
+            self.classifier = torch.nn.Linear(2048, num_classes)
+        else:
+            self.classifier = None
+
         # 2. Register global data as "buffers"
         self.register_buffer('attributes_class_matrix', all_data['attributes_class_matrix'])
         self.register_buffer('train_classes',           all_data['train_classes'])
@@ -52,15 +62,15 @@ class ZSLLightningModel(pl.LightningModule):
         params = []
         lr_lambdas = []
         
-        warmup_steps = 2 * self.steps_per_epoch
+        warmup_steps = self.steps_per_epoch
 
         # Setup Embedding Function Optimization
         if self.train_emb:
             params.append({'params': self.embeddingFunction.parameters(), 'lr': self.config_file.learning_rate})
             
             def emb_warmup(current_step):
-                if current_step < warmup_steps:
-                    return float(current_step) / float(max(1, self.steps_per_epoch))
+                if current_step < 3*self.steps_per_epoch:
+                    return float(current_step) / float(max(1, 3*self.steps_per_epoch))
                 return 1.0
             lr_lambdas.append(emb_warmup)
 
@@ -70,10 +80,21 @@ class ZSLLightningModel(pl.LightningModule):
                            'lr': self.config_file.learning_rate_cnn})
             
             def cnn_warmup(current_step):
-                if current_step < warmup_steps:
-                    return float(current_step) / float(max(1, warmup_steps))
+                if current_step < 4*self.steps_per_epoch:
+                    return float(current_step) / float(max(1, 4*self.steps_per_epoch))
                 return 1.0
             lr_lambdas.append(cnn_warmup)
+
+
+        if self.use_ce_loss and self.classifier is not None:
+            params.append({'params': self.classifier.parameters(), 
+                           'lr': self.config_file.learning_rate_ce})
+            
+            def ce_warmup(current_step):
+                if current_step < self.steps_per_epoch:
+                    return float(current_step) / float(max(1, self.steps_per_epoch))
+                return 1.0
+            lr_lambdas.append(ce_warmup)
 
         # Safety check
         if not params:
@@ -136,6 +157,18 @@ class ZSLLightningModel(pl.LightningModule):
         if self.config_file.regularize:
             l2_loss = sum(torch.sum(param ** 2) / 2.0 for param in self.embeddingFunction.parameters())
             loss += self.config_file.regularization_parameter * l2_loss
+
+        if self.use_ce_loss and self.classifier is not None:
+            # Predict logits directly from the CNN features
+            logits = self.classifier(train_feature)
+            # Calculate standard CE loss
+            ce_loss = torch.nn.functional.cross_entropy(logits, train_label)
+            
+            # Log the CE loss separately so you can monitor it
+            self.log('ce_loss', ce_loss, prog_bar=True, on_step=False, on_epoch=True)
+            
+            # Add it to the main LTN loss, scaled by the weight
+            loss += self.ce_weight * ce_loss
 
         # Calculate Accuracy (without tracking gradients)
         with torch.no_grad():

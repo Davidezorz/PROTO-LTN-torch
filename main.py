@@ -43,7 +43,8 @@ def main():
             config_file=config_file,
             all_data=data_module.all_data,
             train_cnn=config_file.train_cnn,
-            steps_per_epoch=steps
+            steps_per_epoch=steps,
+            strict=False
         )
     else:
         model = ZSLLightningModel(
@@ -64,13 +65,13 @@ def main():
     # gcam.plot_gcam(model, data_module, device)
 
     # TSNE
-    from visualization import plot_tsne_with_synthetic_vectors
-    plot_tsne_with_synthetic_vectors(model, data_module)
+    # from visualization import plot_tsne_with_synthetic_vectors
+    # plot_tsne_with_synthetic_vectors(model, data_module)
     
 
     # 3. Train
-    # trainer = pl.Trainer(max_epochs=config_file.epochs, accelerator=device)
-    # trainer.fit(model, data_module)
+    trainer = pl.Trainer(max_epochs=config_file.epochs, accelerator=device)
+    trainer.fit(model, data_module)
 
 
 

@@ -28,10 +28,13 @@ class config:
     regularization_parameter    = 1e-5
     learning_rate               = 1e-4
     learning_rate_cnn           = 1e-6
+    learning_rate_ce            = 1e-5
 
     compute_feature             = True
-    train_emb                   = False
+    train_emb                   = True
     train_cnn                   = True
+    use_ce_loss                 = True
+    ce_weight                   = 0.1
     # checkpoint                  = 'lightning_logs/version_4/checkpoints/epoch=9-step=7360.ckpt'
     checkpoint                  = 'lightning_logs/version_13/checkpoints/epoch=9-step=7360.ckpt'
     # checkpoint                  =   None
