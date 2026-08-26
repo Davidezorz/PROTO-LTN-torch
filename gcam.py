@@ -24,26 +24,37 @@ class LTN_GradCAM:
         # Hook to capture the activations after the forward pass
         self.activations = output.detach()
 
-    def generate_cam(self, input_image, target_class_idx):
+    def generate_cam(self, input_image, target_class_idx, use_logits=False):
         self.model.zero_grad()
         
         # 1. Forward pass through the CNN to extract visual features
         features = self.model.cnn(input_image)
         
-        # 2. Extract the prototype for the target class (e.g., Zebra)
-        # We fetch the attributes for the target class and pass them through the embedding function
-        target_attributes = self.model.attributes_class_matrix[target_class_idx].unsqueeze(0)
-        prototype = self.model.embeddingFunction(target_attributes)
+        if use_logits:
+            # Ensure the model actually has a classifier initialized
+            if not hasattr(self.model, 'classifier') or self.model.classifier is None:
+                raise ValueError("Cannot compute CAM w.r.t logits: classifier is not initialized.")
+            
+            # Predict logits directly from the CNN features
+            logits = self.model.classifier(features)
+            
+            # Select the logit corresponding to the target class
+            target_score = logits[0, target_class_idx]
+            
+        else:
+            # 2. Extract the prototype for the target class (e.g., Zebra)
+            target_attributes = self.model.attributes_class_matrix[target_class_idx].unsqueeze(0)
+            prototype = self.model.embeddingFunction(target_attributes)
+            
+            # 3. Calculate the LTN truth value (our "class score")
+            feature_var = ltn.Variable("feature", features)
+            prototype_var = ltn.Variable("prototype", prototype)
+            
+            # The truth value is a measure of similarity [0, 1] between the image and the prototype
+            target_score = self.model.embeddingFunction.isOfClass(feature_var, prototype_var).value
         
-        # 3. Calculate the LTN truth value (our "class score")
-        feature_var = ltn.Variable("feature", features)
-        prototype_var = ltn.Variable("prototype", prototype)
-        
-        # The truth value is a measure of similarity [0, 1] between the image and the prototype
-        truth_value = self.model.embeddingFunction.isOfClass(feature_var, prototype_var).value
-        
-        # 4. Backpropagate to get gradients w.r.t. the truth value
-        truth_value.backward(retain_graph=True)
+        # 4. Backpropagate to get gradients w.r.t. the chosen target score
+        target_score.backward(retain_graph=True)
         
         # 5. Generate CAM by weighting the activations by the gradients
         pooled_gradients = torch.mean(self.gradients, dim=[0, 2, 3])
@@ -55,7 +66,7 @@ class LTN_GradCAM:
 
         cam = torch.mean(weighted_activations, dim=1).squeeze().cpu().numpy()
         print(f"cam < 0: {(cam[cam<0]).sum()}")
-        cam = np.maximum(-cam, 0)  # Apply ReLU
+        cam = np.maximum(cam, 0)  # Apply ReLU
         
         # Normalize the heatmap to [0, 1] securely
         if cam.max() - cam.min() > 0:
@@ -65,7 +76,8 @@ class LTN_GradCAM:
 
 
 
-def plot_gcam(model, data_module, device):
+
+def plot_gcam(model, data_module, device, use_logits=False, random_idx=None):
     # 1. Find the index of the "zebra" class in your data
     zebra_idx = data_module.all_data['classes_names'].index('zebra')
     model.cnn.requires_grad_(True)
@@ -84,7 +96,10 @@ def plot_gcam(model, data_module, device):
     zebra_indices = (data_module.ds_train.labels == zebra_idx).nonzero(as_tuple=True)[0]
 
     # Pick a random index from the available zebra images 0, 7 8, 9
-    random_idx = zebra_indices[torch.randint(len(zebra_indices)-1, (1,))].item()
+    if random_idx is None:
+        random_idx = zebra_indices[torch.randint(len(zebra_indices), (1,))].item()
+    else:
+        random_idx = zebra_indices[random_idx]
 
     # Extract the image tensor (shape: [3, 224, 224]), label, and attributes[cite: 3]
     input_image_tensor, label, _ = data_module.ds_train[random_idx]
@@ -94,7 +109,8 @@ def plot_gcam(model, data_module, device):
     input_image.requires_grad_(True)
 
     # 4. Generate the heatmap
-    cam_heatmap = grad_cam.generate_cam(input_image, target_class_idx=zebra_idx)
+    cam_heatmap = grad_cam.generate_cam(input_image, target_class_idx=zebra_idx,
+                                        use_logits=use_logits)
 
     print(f"cam_heatmap all 0s: {np.allclose(cam_heatmap, np.zeros_like(cam_heatmap))}")
     print(f"cam_heatmap sum:    {(np.abs(cam_heatmap)).sum(): .16f}")

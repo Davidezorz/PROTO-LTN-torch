@@ -33,10 +33,11 @@ class config:
     compute_feature             = True
     train_emb                   = True
     train_cnn                   = True
-    use_ce_loss                 = True
+    use_ce_loss                 = False
     ce_weight                   = 0.1
-    # checkpoint                  = 'lightning_logs/version_4/checkpoints/epoch=9-step=7360.ckpt'
-    checkpoint                  = 'lightning_logs/version_13/checkpoints/epoch=9-step=7360.ckpt'
+    # checkpoint                  = 'lightning_logs/version_4/checkpoints/epoch=9-step=7360.ckpt'  # trained emb
+    checkpoint                  = 'lightning_logs/version_13/checkpoints/epoch=9-step=7360.ckpt' # fine tuned cnn
+    # checkpoint                  = 'lightning_logs/version_14/checkpoints/epoch=9-step=7360.ckpt'   # trained emb, cnn, classifier
     # checkpoint                  =   None
 
     experiment_name             = 'Awa2_ENDTOEND_ZSL_prototypes_with_LTN_v4_negation_TRUNCATED_0.01'

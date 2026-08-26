@@ -58,12 +58,10 @@ def show_loader_examples(pos_loader, neg_loader, n_images=32):
 
 
 
-
-
-
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from captum.concept import TCAV, Concept
+import torch
 
 def load_pure_concept_lib(concept_path, device):
     # Use the same transforms as your ZSL dataset
@@ -85,21 +83,34 @@ def load_pure_concept_lib(concept_path, device):
     return DataLoader(StripLabelDataset(dataset), batch_size=16, shuffle=True)
 
 
-
 class Wrapper(torch.nn.Module):
-    def __init__(self, lightning_model, target_prototype):
+    def __init__(self, lightning_model, target_prototype, target_class_idx, use_logits=False):
         super().__init__()
         self.cnn = lightning_model.cnn
-        self.classifier = lightning_model.embeddingFunction.isOfClass.model
+        # The LTN predicate model
+        self.ltn_classifier = lightning_model.embeddingFunction.isOfClass.model
+        # The auxiliary linear classifier
+        self.linear_classifier = getattr(lightning_model, 'classifier', None)
+        
         self.target_prototype = target_prototype
+        self.target_class_idx = target_class_idx
+        self.use_logits = use_logits
 
     def forward(self, img):
         features = self.cnn(img)
-        return self.classifier(features, self.target_prototype).unsqueeze(1)
+        
+        if self.use_logits:
+            if self.linear_classifier is None:
+                raise ValueError("Model does not have a linear classifier initialized.")
+            # Predict logits and extract the single score for the target class
+            logits = self.linear_classifier(features)
+            return logits[:, self.target_class_idx].unsqueeze(1)
+        else:
+            # Calculate and return the LTN truth value
+            return self.ltn_classifier(features, self.target_prototype).unsqueeze(1)
 
 
-    
-def run_tutorial_tcav_lib(lightning_model, data_module, target_class_name="zebra"):
+def run_tutorial_tcav_lib(lightning_model, data_module, target_class_name="zebra", use_logits=False):
     lightning_model.eval()
     device = lightning_model.device
     
@@ -114,14 +125,19 @@ def run_tutorial_tcav_lib(lightning_model, data_module, target_class_name="zebra
     concept_target = Concept(id=0, name="stripes", data_iter=pos_loader)
     concept_random = Concept(id=1, name="random", data_iter=neg_loader)
     
-    # 2. Setup the Wrapper (same as before)
+    # 2. Setup the Wrapper
     class_idx = data_module.all_data['classes_names'].index(target_class_name)
     target_attributes = data_module.all_data['attributes_class_matrix'][class_idx].unsqueeze(0).to(device)
     
     with torch.no_grad():
         target_prototype = lightning_model.embeddingFunction(target_attributes)
         
-    wrapper_model = Wrapper(lightning_model, target_prototype).to(device)
+    wrapper_model = Wrapper(
+        lightning_model, 
+        target_prototype, 
+        target_class_idx=class_idx, 
+        use_logits=use_logits
+    ).to(device)
     
     # 3. Run Captum TCAV
     tcav = TCAV(model=wrapper_model, layers=['cnn.9'], save_path="./tcav_results_pure/") 
@@ -138,6 +154,9 @@ def run_tutorial_tcav_lib(lightning_model, data_module, target_class_name="zebra
         target=0 
     )
     
+    # Print a helpful prefix so you know which path was evaluated
+    eval_type = "Logits" if use_logits else "LTN Prototype"
+    print(f"\nTCAV Scores ({eval_type}):")
     print(scores)
 
 
