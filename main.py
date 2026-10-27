@@ -54,26 +54,28 @@ def main():
     model.to(device)
 
 
-    #TCAV
+    # Train
+    trainer = pl.Trainer(max_epochs=config_file.epochs, accelerator=device)
+    trainer.fit(model, data_module)
+
+
+    # TCAV
     # TCAV.run_tcav(model, data_module, target_class_name="tiger", attribute_name="stripes")
-    # TCAV.run_tutorial_tcav_lib(model, data_module, target_class_name="tiger", use_logits=True)
+    TCAV.run_tutorial_tcav_lib(model, data_module, target_class_name="tiger", use_logits=True)
 
     # grad cam
     pl.seed_everything(0)
     for i in range(15, 25):
-        #gcam.plot_gcam(model, data_module, device, use_logits=config_file.use_ce_loss, random_idx=i)
+        gcam.plot_gcam(model, data_module, device, use_logits=config_file.use_ce_loss, random_idx=i)
         pass
 
     # TSNE
     import visualization 
     visualization.plot_tsne_with_synthetic_vectors(model, data_module)
-    # visualization.plot_image_embeddings_tsne(model, data_module)
-    #visualization.plot_image_embeddings_with_centroids(model, data_module)
+    visualization.plot_image_embeddings_tsne(model, data_module)
+    # visualization.plot_image_embeddings_with_centroids(model, data_module)
     # visualization.plot_image_embeddings_with_actual_centroids(model, data_module)
 
-    # 3. Train
-    # trainer = pl.Trainer(max_epochs=config_file.epochs, accelerator=device)
-    # trainer.fit(model, data_module)
 
 
 
