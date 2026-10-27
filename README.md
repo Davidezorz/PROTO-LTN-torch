@@ -8,7 +8,7 @@ This work is based on the following paper:
 > **PROTOtypical Logic Tensor Networks (PROTO-LTN) for Zero Shot Learning**
 > by Simone Martone, Francesco Manigrasso, Fabrizio Lamberti, Lia Morra
 
-- **Original Repository:** [https://github.com/Frankkkko/PROTO-LTN](https://github.com/Frankkkko/PROTO-LTN)
+- **Original Repository:** [https://github.com/FrancescoManigrass/PROTO-LTN](https://github.com/FrancescoManigrass/PROTO-LTN)
 - **This Repository:** [https://github.com/Davidezorz/PROTO-LTN-torch](https://github.com/Davidezorz/PROTO-LTN-torch)
 
 ## 🔧 What's New in This Implementation
